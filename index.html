@@ -733,6 +733,7 @@ async function pullFromSupabase() {
     if (pe) throw pe;
     if (tasks    !== null) state.tasks    = tasks.map(t => ({ ...t, subtasks: t.subtasks || [] }));
     if (projects !== null) state.projects = projects;
+    resetRecurringTasks(); // revive any that are due; keep completed ones hidden
     localStorage.setItem('north_tasks',    JSON.stringify(state.tasks));
     localStorage.setItem('north_projects', JSON.stringify(state.projects));
     setDot('synced');
@@ -750,8 +751,10 @@ async function syncNow() {
 async function pushTask(task) {
   if (!sbClient || !sbUser) return;
   try {
+    // Strip client-only fields that have no column in Supabase
+    const { last_done_date, _score, ...taskData } = task;
     const { error } = await sbClient.from('tasks').upsert({
-      ...task,
+      ...taskData,
       user_id:  sbUser.id,
       subtasks: task.subtasks || [],
     });
@@ -1195,14 +1198,12 @@ function deleteTask(id) {
 function completeTask(id) {
   const task = state.tasks.find(t => t.id === id); if (!task) return;
   if (task.recurrence && task.recurrence !== 'none') {
-    // Mark completed for today — disappears now, reappears tomorrow
-    const today = new Date().toISOString().slice(0, 10);
-    const next  = new Date();
+    // Mark completed for today — disappears now, reappears when due_date arrives
+    const next = new Date();
     if (task.recurrence === 'daily')  next.setDate(next.getDate() + 1);
     if (task.recurrence === 'weekly') next.setDate(next.getDate() + 7);
-    task.status         = 'completed';
-    task.last_done_date = today;
-    task.due_date       = next.toISOString().slice(0, 10);
+    task.status   = 'completed';
+    task.due_date = next.toISOString().slice(0, 10);
   } else {
     task.status = 'completed';
   }
@@ -1211,13 +1212,14 @@ function completeTask(id) {
   pushTask(task);
 }
 
-// Called on every app load — revives recurring tasks whose next due date has arrived
+// Called on every app load and after every sync pull —
+// revives recurring tasks whose due_date has arrived
 function resetRecurringTasks() {
   const today   = new Date().toISOString().slice(0, 10);
   const toReset = state.tasks.filter(t =>
     t.recurrence && t.recurrence !== 'none' &&
     t.status === 'completed' &&
-    t.last_done_date && t.last_done_date < today
+    (!t.due_date || t.due_date <= today)
   );
   if (!toReset.length) return;
   toReset.forEach(task => {

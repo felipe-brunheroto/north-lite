@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>North</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --bg2: #161616;
+    --bg3: #1e1e1e;
+    --border: #2a2a2a;
+    --text: #f0ede8;
+    --muted: #6b6560;
+    --accent: #c8a96e;
+    --accent-dim: rgba(200, 169, 110, 0.12);
+    --red: #c0604a;
+    --green: #6a9e72;
+    --blocked-opacity: 0.45;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .app { display: flex; flex-direction: column; min-height: 100vh; max-width: 720px; margin: 0 auto; padding: 0 24px; }
+
+  header {
+    padding: 32px 0 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  /* Sync status dot — lives next to the logo */
+  .sync-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #3a3a3a;
+    display: inline-block;
+    flex-shrink: 0;
+    margin-bottom: 3px;
+    transition: background 0.4s;
+    cursor: default;
+  }
+  .context-select {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    letter-spacing: 0.05em;
+  }
+  .context-select:focus { border-color: var(--accent); }
+
+  nav {
+    display: flex;
+    gap: 0;
+    padding: 20px 0 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 16px 10px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .nav-btn:first-child { padding-left: 0; }
+  .nav-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+  .nav-btn:hover:not(.active) { color: var(--text); }
+
+  main { padding: 32px 0 64px; flex: 1; }
+
+  .section { margin-bottom: 40px; }
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .task-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    transition: border-color 0.15s, opacity 0.15s;
+    position: relative;
+  }
+  .task-card:hover { border-color: var(--border); border-left-color: transparent; }
+  .task-card.active-task { border-left-color: var(--accent); background: var(--accent-dim); }
+  .task-card.blocked-task { opacity: var(--blocked-opacity); }
+  .task-card.completed-task { opacity: 0.3; }
+
+  .task-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .task-title { font-family: 'Instrument Serif', serif; font-size: 16px; line-height: 1.3; flex: 1; }
+  .task-title.done { text-decoration: line-through; opacity: 0.5; }
+  .task-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .task-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .task-btn:hover { color: var(--text); border-color: var(--muted); }
+  .task-btn.done-btn:hover { color: var(--green); border-color: var(--green); }
+  .task-btn.delete-btn:hover { color: var(--red); border-color: var(--red); }
+
+  .task-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+  .badge { font-size: 10px; letter-spacing: 0.06em; padding: 2px 7px; border: 1px solid var(--border); color: var(--muted); }
+  .badge.load-high { border-color: rgba(192,96,74,0.4); color: #c0604a; }
+  .badge.load-medium { border-color: rgba(200,169,110,0.4); color: var(--accent); }
+  .badge.load-low { border-color: rgba(106,158,114,0.4); color: var(--green); }
+  .badge.resist-high { border-color: rgba(192,96,74,0.3); color: rgba(192,96,74,0.8); }
+  .badge.recurring { border-color: rgba(106,158,114,0.4); color: var(--green); }
+
+  .task-next { margin-top: 8px; font-size: 12px; color: var(--muted); font-style: italic; }
+  .task-next span { color: var(--accent); font-style: normal; }
+
+  .subtasks { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .subtask-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--muted); }
+  .subtask-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+  .subtask-item.done-sub { text-decoration: line-through; opacity: 0.4; }
+
+  .ai-subtasks { margin-top: 10px; padding: 10px; background: rgba(200,169,110,0.06); border: 1px dashed rgba(200,169,110,0.3); }
+  .ai-subtasks-title { font-size: 10px; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 8px; }
+  .ai-subtask-suggestion { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12px; }
+  .ai-accept-btn { background: none; border: 1px solid rgba(200,169,110,0.4); color: var(--accent); font-family: 'DM Mono', monospace; font-size: 10px; padding: 2px 6px; cursor: pointer; }
+  .ai-accept-btn:hover { background: var(--accent-dim); }
+
+  .empty { color: var(--muted); font-size: 12px; padding: 16px 0; font-style: italic; }
+
+  .what-next-btn {
+    width: 100%; background: none; border: 1px solid var(--border); color: var(--muted);
+    font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 12px; cursor: pointer; transition: all 0.15s; margin-bottom: 24px;
+  }
+  .what-next-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .suggestion-panel { background: var(--accent-dim); border: 1px solid rgba(200,169,110,0.25); padding: 16px; margin-bottom: 24px; display: none; }
+  .suggestion-panel.visible { display: block; }
+  .suggestion-rec { font-family: 'Instrument Serif', serif; font-size: 18px; line-height: 1.4; color: var(--text); margin-bottom: 8px; }
+  .suggestion-why { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  .overload-banner { background: rgba(192,96,74,0.1); border: 1px solid rgba(192,96,74,0.3); padding: 12px 16px; margin-bottom: 24px; display: none; }
+  .overload-banner.visible { display: block; }
+  .overload-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--red); margin-bottom: 4px; }
+  .overload-msg { font-size: 12px; color: var(--muted); }
+
+  .form-panel { background: var(--bg2); border: 1px solid var(--border); padding: 24px; margin-bottom: 32px; display: none; }
+  .form-panel.visible { display: block; }
+  .form-title { font-family: 'Instrument Serif', serif; font-size: 20px; margin-bottom: 20px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-full { grid-column: 1 / -1; }
+
+  label { display: block; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+
+  input[type="text"], input[type="date"], input[type="number"], input[type="email"], input[type="password"], select, textarea {
+    width: 100%; background: var(--bg3); border: 1px solid var(--border); color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 12px; padding: 8px 10px; outline: none; transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+  select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+  textarea { resize: vertical; min-height: 60px; }
+
+  .range-wrap { display: flex; align-items: center; gap: 10px; }
+  .range-wrap input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .range-val { min-width: 20px; text-align: center; color: var(--accent); }
+
+  .form-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-primary {
+    background: var(--accent); border: none; color: var(--bg); font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 20px; cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-secondary {
+    background: none; border: 1px solid var(--border); color: var(--muted); font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 20px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  }
+  .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+
+  .add-task-btn {
+    background: none; border: 1px dashed var(--border); color: var(--muted); font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.06em; padding: 10px 16px; cursor: pointer; transition: all 0.15s; width: 100%; text-align: left; margin-top: 8px;
+  }
+  .add-task-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .triage-card { background: var(--bg2); border: 1px solid var(--border); padding: 16px; margin-bottom: 10px; }
+  .triage-title { font-family: 'Instrument Serif', serif; font-size: 16px; margin-bottom: 12px; }
+  .triage-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .triage-select {
+    background: var(--bg3); border: 1px solid var(--border); color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 11px; padding: 5px 8px; outline: none; appearance: none; -webkit-appearance: none; cursor: pointer; flex: 1; min-width: 100px;
+  }
+  .triage-confirm { background: none; border: 1px solid var(--accent); color: var(--accent); font-family: 'DM Mono', monospace; font-size: 11px; padding: 5px 14px; cursor: pointer; }
+  .triage-confirm:hover { background: var(--accent-dim); }
+
+  .project-card { background: var(--bg2); border: 1px solid var(--border); padding: 14px 16px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .project-name { font-family: 'Instrument Serif', serif; font-size: 16px; }
+  .project-status { font-size: 10px; letter-spacing: 0.08em; color: var(--muted); }
+  .project-task-count { font-size: 11px; color: var(--muted); }
+
+  .setup-panel { background: var(--bg2); border: 1px solid rgba(200,169,110,0.3); padding: 20px; margin-bottom: 24px; }
+  .setup-title { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  .setup-note { font-size: 11px; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+  .setup-row { display: flex; gap: 10px; }
+  .setup-row input { flex: 1; }
+  .setup-save {
+    background: none; border: 1px solid var(--accent); color: var(--accent); font-family: 'DM Mono', monospace;
+    font-size: 11px; padding: 8px 14px; cursor: pointer; white-space: nowrap;
+  }
+  .setup-save:hover { background: var(--accent-dim); }
+
+  .loading { color: var(--muted); font-size: 11px; font-style: italic; padding: 8px 0; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .loading { animation: pulse 1.2s ease-in-out infinite; }
+
+  /* ── SUPABASE LOGIN OVERLAY ── */
+  .sb-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,15,15,0.97); z-index: 200;
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .sb-overlay.open { display: flex; }
+  .sb-box { background: var(--bg2); border: 1px solid var(--border); padding: 36px; width: 100%; max-width: 400px; }
+  .sb-logo { font-family: 'Instrument Serif', serif; font-size: 28px; color: var(--accent); margin-bottom: 4px; }
+  .sb-sub { font-size: 11px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+  .sb-field { margin-bottom: 14px; }
+  .sb-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  .sb-err { color: var(--red); font-size: 11px; margin-top: 10px; min-height: 16px; line-height: 1.4; }
+  .sb-toggle { font-size: 11px; color: var(--muted); margin-top: 18px; }
+  .sb-toggle button { background: none; border: none; color: var(--accent); font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); }
+
+  @media (max-width: 480px) {
+    .form-grid { grid-template-columns: 1fr; }
+    .app { padding: 0 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── SUPABASE LOGIN OVERLAY ────────────────────────────────────────────── -->
+<div class="sb-overlay" id="sbOverlay">
+  <div class="sb-box">
+    <div class="sb-logo">North</div>
+    <div class="sb-sub" id="sbSub">Sign in to sync your tasks across devices.</div>
+    <div class="sb-field">
+      <label>Email</label>
+      <input type="email" id="sbEmail" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="sb-field">
+      <label>Password</label>
+      <input type="password" id="sbPassword" placeholder="••••••••" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter') sbSubmit()" />
+    </div>
+    <div class="sb-actions">
+      <button class="btn-primary" id="sbSubmitBtn" onclick="sbSubmit()">Sign In</button>
+      <button class="btn-secondary" onclick="sbUseOffline()">Use Offline</button>
+    </div>
+    <div class="sb-err" id="sbErr"></div>
+    <div class="sb-toggle">
+      <span id="sbToggleTxt">No account yet?</span>
+      <button onclick="sbToggleMode()">Sign Up</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── MAIN APP ──────────────────────────────────────────────────────────── -->
+<div class="app">
+  <header>
+    <div class="logo">
+      North
+      <span class="sync-dot" id="syncDot" title="Sync: not connected"></span>
+    </div>
+    <select class="context-select" id="contextSelect" onchange="setContext(this.value)">
+      <option value="deep_focus">Deep Focus</option>
+      <option value="admin_block">Admin Block</option>
+      <option value="fragmented">Fragmented</option>
+      <option value="low_energy">Low Energy</option>
+    </select>
+  </header>
+
+  <nav>
+    <button class="nav-btn active" onclick="showTab('today')">Today</button>
+    <button class="nav-btn" onclick="showTab('inbox')">Inbox</button>
+    <button class="nav-btn" onclick="showTab('projects')">Projects</button>
+    <button class="nav-btn" onclick="showTab('all')">All Tasks</button>
+    <button class="nav-btn" onclick="showTab('settings')">Settings</button>
+  </nav>
+
+  <main>
+    <!-- TODAY -->
+    <div id="tab-today">
+      <div id="setupPanel" class="setup-panel" style="display:none;">
+        <div class="setup-title">Anthropic API Key Required</div>
+        <div class="setup-note">To use AI features (What Next, Decompose), add your key. Stored only in your browser. Get yours at console.anthropic.com</div>
+        <div class="setup-row">
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+          <button class="setup-save" onclick="saveApiKey()">Save Key</button>
+        </div>
+      </div>
+
+      <div id="overloadBanner" class="overload-banner">
+        <div class="overload-title">Cognitive Overload Detected</div>
+        <div class="overload-msg" id="overloadMsg"></div>
+      </div>
+
+      <button class="what-next-btn" onclick="askWhatNext()">→ What should I do right now?</button>
+
+      <div id="suggestionPanel" class="suggestion-panel">
+        <div class="suggestion-rec" id="suggestionRec"></div>
+        <div class="suggestion-why" id="suggestionWhy"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-label">Top Priorities</div>
+        <div id="topPrioritiesList"></div>
+      </div>
+      <div class="section">
+        <div class="section-label">Quick Wins</div>
+        <div id="quickWinsList"></div>
+      </div>
+      <div class="section" id="deepWorkSection">
+        <div class="section-label">Deep Work</div>
+        <div id="deepWorkList"></div>
+      </div>
+      <div class="section">
+        <div class="section-label">Blocked / Waiting</div>
+        <div id="blockedList"></div>
+      </div>
+
+      <button class="add-task-btn" onclick="openAddTask('today')">+ Add task</button>
+    </div>
+
+    <!-- INBOX -->
+    <div id="tab-inbox" style="display:none;">
+      <div class="section">
+        <div class="section-label">Inbox — Triage</div>
+        <div id="inboxList"></div>
+        <div class="empty" id="inboxEmpty" style="display:none;">Inbox is clear.</div>
+      </div>
+      <button class="add-task-btn" onclick="openAddTask('inbox')">+ Capture task</button>
+    </div>
+
+    <!-- PROJECTS -->
+    <div id="tab-projects" style="display:none;">
+      <div class="section">
+        <div class="section-label">Projects</div>
+        <div id="projectsList"></div>
+      </div>
+      <div id="addProjectForm" class="form-panel">
+        <div class="form-title">New Project</div>
+        <div class="form-grid">
+          <div class="form-full">
+            <label>Project Name</label>
+            <input type="text" id="projTitle" placeholder="e.g. Research paper, Clinic restructure" />
+          </div>
+          <div class="form-full">
+            <label>Description</label>
+            <textarea id="projDesc" rows="2" placeholder="Optional context..."></textarea>
+          </div>
+          <div>
+            <label>Status</label>
+            <select id="projStatus">
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+            </select>
+          </div>
+          <div>
+            <label>Priority (1–5)</label>
+            <div class="range-wrap">
+              <input type="range" min="1" max="5" value="3" id="projPriority" oninput="document.getElementById('projPriorityVal').textContent=this.value" />
+              <span class="range-val" id="projPriorityVal">3</span>
+            </div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" onclick="saveProject()">Save Project</button>
+          <button class="btn-secondary" onclick="closeProjectForm()">Cancel</button>
+        </div>
+      </div>
+      <button class="add-task-btn" onclick="openProjectForm()">+ New project</button>
+      <div id="projectAiPanel" style="display:none;" class="ai-subtasks">
+        <div class="ai-subtasks-title" id="projectAiTitle">AI Suggested Tasks</div>
+        <div id="projectAiList"></div>
+      </div>
+    </div>
+
+    <!-- ALL TASKS -->
+    <div id="tab-all" style="display:none;">
+      <div class="section">
+        <div class="section-label">All Active Tasks</div>
+        <div id="allTasksList"></div>
+      </div>
+      <div class="section">
+        <div class="section-label" style="cursor:pointer;" onclick="toggleCompleted()">
+          Completed <span id="completedToggleLabel" style="font-size:10px;color:var(--muted);margin-left:4px;">(show)</span>
+        </div>
+        <div id="completedTasksList" style="display:none;"></div>
+      </div>
+      <button class="add-task-btn" onclick="openAddTask('all')">+ Add task</button>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="tab-settings" style="display:none;">
+      <!-- SYNC SECTION -->
+      <div class="section">
+        <div class="section-label">Sync</div>
+        <div class="setup-panel">
+          <div class="setup-title">Cross-Device Sync</div>
+          <div class="setup-note">
+            Paste your Supabase Project URL and anon key below. You only do this once — it's saved in your browser.
+            Get these from your Supabase project under <strong style="color:var(--text);">Settings → API</strong>.
+          </div>
+          <div style="margin-bottom:12px;">
+            <label>Project URL</label>
+            <input type="text" id="sbUrlInput" placeholder="https://xxxx.supabase.co" />
+          </div>
+          <div style="margin-bottom:16px;">
+            <label>Anon / Public Key</label>
+            <input type="text" id="sbKeyInput" placeholder="eyJhbGci..." />
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="setup-save" onclick="saveSbCreds()">Save &amp; Connect</button>
+            <button class="setup-save" id="sbSyncNowBtn" onclick="syncNow()" style="display:none;">↻ Sync Now</button>
+            <button class="setup-save" id="sbSignOutBtn" onclick="sbSignOut()"
+                    style="display:none;border-color:var(--red);color:var(--red);">Sign Out</button>
+          </div>
+          <div id="sbSettingsMsg" style="margin-top:12px;font-size:11px;color:var(--muted);line-height:1.5;"></div>
+        </div>
+      </div>
+
+      <!-- AI KEY SECTION -->
+      <div class="section">
+        <div class="section-label">API Key</div>
+        <div class="setup-panel">
+          <div class="setup-title">Anthropic API Key</div>
+          <div class="setup-note">Enables AI features: What Next, Decompose, project task generation. Stored only in your browser.</div>
+          <div class="setup-row">
+            <input type="password" id="apiKeyInputSettings" placeholder="sk-ant-..." />
+            <button class="setup-save" onclick="saveApiKeyFromSettings()">Save Key</button>
+          </div>
+          <div id="apiKeyStatus" style="margin-top:8px;font-size:11px;color:var(--muted);"></div>
+        </div>
+      </div>
+
+      <!-- DATA SECTION -->
+      <div class="section">
+        <div class="section-label">Data</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn-secondary" onclick="exportData()">Export JSON backup</button>
+          <button class="btn-secondary" onclick="importDataClick()">Import JSON backup</button>
+          <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)" />
+          <button class="btn-secondary" style="color:var(--red);border-color:rgba(192,96,74,0.3);" onclick="clearAllData()">Clear all data</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TASK FORM (full-screen modal) -->
+    <div id="taskFormPanel" class="form-panel"
+         style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:100;overflow-y:auto;background:var(--bg);padding:32px 24px;max-width:720px;margin:0 auto;">
+      <div class="form-title" id="taskFormTitle">New Task</div>
+      <div class="form-grid">
+        <div class="form-full">
+          <label>Title *</label>
+          <input type="text" id="taskTitle" placeholder="What needs to be done?" />
+        </div>
+        <div class="form-full">
+          <label>Next Action</label>
+          <input type="text" id="taskNextAction" placeholder="The very next physical step..." />
+        </div>
+        <div class="form-full">
+          <label>Description</label>
+          <textarea id="taskDesc" placeholder="Context, notes, links..."></textarea>
+        </div>
+        <div>
+          <label>Project</label>
+          <select id="taskProject"><option value="">— No project —</option></select>
+        </div>
+        <div>
+          <label>Type</label>
+          <select id="taskType">
+            <option value="deep_work">Deep Work</option>
+            <option value="administrative">Administrative</option>
+            <option value="routine">Routine</option>
+            <option value="urgent">Urgent</option>
+            <option value="delegable">Delegable</option>
+          </select>
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="taskStatus">
+            <option value="inbox">Inbox</option>
+            <option value="planned">Planned</option>
+            <option value="active">Active</option>
+            <option value="blocked">Blocked</option>
+            <option value="waiting">Waiting</option>
+            <option value="review">Review</option>
+          </select>
+        </div>
+        <div>
+          <label>Cognitive Load</label>
+          <select id="taskLoad">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div>
+          <label>Emotional Resistance</label>
+          <select id="taskResistance">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div>
+          <label>Urgency (1–5)</label>
+          <div class="range-wrap">
+            <input type="range" min="1" max="5" value="3" id="taskUrgency" oninput="document.getElementById('taskUrgencyVal').textContent=this.value" />
+            <span class="range-val" id="taskUrgencyVal">3</span>
+          </div>
+        </div>
+        <div>
+          <label>Priority (1–5)</label>
+          <div class="range-wrap">
+            <input type="range" min="1" max="5" value="3" id="taskPriority" oninput="document.getElementById('taskPriorityVal').textContent=this.value" />
+            <span class="range-val" id="taskPriorityVal">3</span>
+          </div>
+        </div>
+        <div>
+          <label>Est. Minutes</label>
+          <input type="number" id="taskMinutes" placeholder="e.g. 30" min="1" />
+        </div>
+        <div>
+          <label>Due Date</label>
+          <input type="date" id="taskDueDate" />
+        </div>
+        <div>
+          <label>Recurrence</label>
+          <select id="taskRecurrence">
+            <option value="none">None</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+          </select>
+        </div>
+        <div>
+          <label>Delegable?</label>
+          <select id="taskDelegable">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-primary" onclick="saveTask()">Save Task</button>
+        <button class="btn-secondary" onclick="closeTaskForm()">Cancel</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let state = {
+  tasks: [],
+  projects: [],
+  context: 'deep_focus',
+  editingTaskId: null,
+  editingProjectId: null,
+};
+
+const CONTEXTS = {
+  deep_focus:  { name: 'Deep Focus',  deep_work_allowed: true,  allowed_load: 'high'   },
+  admin_block: { name: 'Admin Block', deep_work_allowed: false, allowed_load: 'medium' },
+  fragmented:  { name: 'Fragmented',  deep_work_allowed: false, allowed_load: 'low'    },
+  low_energy:  { name: 'Low Energy',  deep_work_allowed: false, allowed_load: 'low'    },
+};
+
+// ─── SUPABASE LAYER ───────────────────────────────────────────────────────────
+let sbClient = null;
+let sbUser   = null;
+let sbMode   = 'signin'; // 'signin' | 'signup'
+
+function getSbCreds() {
+  return {
+    url: localStorage.getItem('north_sb_url') || '',
+    key: localStorage.getItem('north_sb_key') || '',
+  };
+}
+
+// Visual sync indicator in header
+function setDot(status) {
+  const dot = document.getElementById('syncDot');
+  if (!dot) return;
+  const map = {
+    idle:    { color: '#3a3a3a', label: 'Not connected' },
+    syncing: { color: '#c8a96e', label: 'Syncing…'      },
+    synced:  { color: '#6a9e72', label: 'Synced'         },
+    error:   { color: '#c0604a', label: 'Sync error'     },
+  };
+  const s = map[status] || map.idle;
+  dot.style.background = s.color;
+  dot.title = s.label;
+}
+
+async function initSupabase() {
+  const { url, key } = getSbCreds();
+  if (!url || !key) { setDot('idle'); return; }
+  try {
+    sbClient = window.supabase.createClient(url, key, {
+      auth: { persistSession: true, storageKey: 'north_sb_session' },
+    });
+    setDot('syncing');
+    const { data: { session } } = await sbClient.auth.getSession();
+    if (session) {
+      sbUser = session.user;
+      await pullFromSupabase();
+      render();
+      updateSbSettingsUI();
+    } else {
+      setDot('idle');
+      openSbOverlay();
+    }
+  } catch(e) {
+    console.error('Supabase init:', e);
+    setDot('error');
+  }
+}
+
+// ── Overlay helpers ──────────────────────────────────────────────────────────
+function openSbOverlay() {
+  document.getElementById('sbOverlay').classList.add('open');
+}
+function closeSbOverlay() {
+  document.getElementById('sbOverlay').classList.remove('open');
+}
+function sbUseOffline() {
+  closeSbOverlay();
+}
+function sbToggleMode() {
+  sbMode = sbMode === 'signin' ? 'signup' : 'signin';
+  const isSignIn = sbMode === 'signin';
+  document.getElementById('sbSubmitBtn').textContent  = isSignIn ? 'Sign In' : 'Sign Up';
+  document.getElementById('sbSub').textContent         = isSignIn
+    ? 'Sign in to sync your tasks across devices.'
+    : 'Create your account — it takes 10 seconds.';
+  document.getElementById('sbToggleTxt').textContent   = isSignIn ? 'No account yet?' : 'Already have an account?';
+  document.querySelector('.sb-toggle button').textContent = isSignIn ? 'Sign Up' : 'Sign In';
+  document.getElementById('sbErr').textContent         = '';
+}
+
+async function sbSubmit() {
+  if (!sbClient) return;
+  const email    = document.getElementById('sbEmail').value.trim();
+  const password = document.getElementById('sbPassword').value;
+  const errEl    = document.getElementById('sbErr');
+  errEl.textContent = '';
+  if (!email || !password) { errEl.textContent = 'Email and password are required.'; return; }
+
+  document.getElementById('sbSubmitBtn').textContent = '…';
+  setDot('syncing');
+
+  try {
+    let authData, authError;
+    if (sbMode === 'signin') {
+      ({ data: authData, error: authError } = await sbClient.auth.signInWithPassword({ email, password }));
+    } else {
+      ({ data: authData, error: authError } = await sbClient.auth.signUp({ email, password }));
+    }
+    if (authError) throw authError;
+    if (!authData.user) throw new Error('No user returned — check Supabase email confirmation settings.');
+
+    sbUser = authData.user;
+    closeSbOverlay();
+    await pullFromSupabase();
+    render();
+    updateSbSettingsUI();
+  } catch(e) {
+    errEl.textContent = e.message || 'Authentication failed.';
+    setDot('error');
+  } finally {
+    document.getElementById('sbSubmitBtn').textContent = sbMode === 'signin' ? 'Sign In' : 'Sign Up';
+  }
+}
+
+async function sbSignOut() {
+  if (sbClient) await sbClient.auth.signOut();
+  sbUser = null;
+  setDot('idle');
+  updateSbSettingsUI();
+}
+
+// ── Data sync ────────────────────────────────────────────────────────────────
+async function pullFromSupabase() {
+  if (!sbClient || !sbUser) return;
+  setDot('syncing');
+  try {
+    const [{ data: tasks, error: te }, { data: projects, error: pe }] = await Promise.all([
+      sbClient.from('tasks').select('*').order('created_at', { ascending: true }),
+      sbClient.from('projects').select('*').order('created_at', { ascending: true }),
+    ]);
+    if (te) throw te;
+    if (pe) throw pe;
+    if (tasks    !== null) state.tasks    = tasks.map(t => ({ ...t, subtasks: t.subtasks || [] }));
+    if (projects !== null) state.projects = projects;
+    localStorage.setItem('north_tasks',    JSON.stringify(state.tasks));
+    localStorage.setItem('north_projects', JSON.stringify(state.projects));
+    setDot('synced');
+  } catch(e) {
+    console.error('Pull:', e);
+    setDot('error');
+  }
+}
+
+async function syncNow() {
+  await pullFromSupabase();
+  render();
+}
+
+async function pushTask(task) {
+  if (!sbClient || !sbUser) return;
+  try {
+    const { error } = await sbClient.from('tasks').upsert({
+      ...task,
+      user_id:  sbUser.id,
+      subtasks: task.subtasks || [],
+    });
+    if (error) { console.error('pushTask:', error); setDot('error'); }
+    else setDot('synced');
+  } catch(e) { console.error(e); setDot('error'); }
+}
+
+async function removeTaskSb(id) {
+  if (!sbClient || !sbUser) return;
+  try {
+    const { error } = await sbClient.from('tasks').delete().eq('id', id);
+    if (error) { console.error('removeTask:', error); setDot('error'); }
+    else setDot('synced');
+  } catch(e) { console.error(e); setDot('error'); }
+}
+
+async function pushProject(project) {
+  if (!sbClient || !sbUser) return;
+  try {
+    const { error } = await sbClient.from('projects').upsert({ ...project, user_id: sbUser.id });
+    if (error) { console.error('pushProject:', error); setDot('error'); }
+    else setDot('synced');
+  } catch(e) { console.error(e); setDot('error'); }
+}
+
+async function removeProjectSb(id) {
+  if (!sbClient || !sbUser) return;
+  try {
+    const { error } = await sbClient.from('projects').delete().eq('id', id);
+    if (error) { console.error('removeProject:', error); setDot('error'); }
+    else setDot('synced');
+  } catch(e) { console.error(e); setDot('error'); }
+}
+
+// ── Settings UI ──────────────────────────────────────────────────────────────
+function saveSbCreds() {
+  const url = document.getElementById('sbUrlInput').value.trim();
+  const key = document.getElementById('sbKeyInput').value.trim();
+  if (!url || !key) { document.getElementById('sbSettingsMsg').textContent = 'Both fields are required.'; return; }
+  localStorage.setItem('north_sb_url', url);
+  localStorage.setItem('north_sb_key', key);
+  document.getElementById('sbSettingsMsg').textContent = 'Connecting…';
+  // Re-init so the overlay appears if not yet signed in
+  sbClient = null; sbUser = null;
+  initSupabase().then(updateSbSettingsUI);
+}
+
+function updateSbSettingsUI() {
+  const msg        = document.getElementById('sbSettingsMsg');
+  const syncBtn    = document.getElementById('sbSyncNowBtn');
+  const signOutBtn = document.getElementById('sbSignOutBtn');
+  const urlInput   = document.getElementById('sbUrlInput');
+  const { url, key } = getSbCreds();
+
+  if (urlInput && url) urlInput.value = url;
+  const keyInput = document.getElementById('sbKeyInput');
+  if (keyInput && key) keyInput.value = key;
+
+  if (sbUser) {
+    if (msg)        msg.textContent        = `✓ Signed in as ${sbUser.email}`;
+    if (syncBtn)    syncBtn.style.display  = '';
+    if (signOutBtn) signOutBtn.style.display = '';
+  } else if (url && key) {
+    if (msg)        msg.textContent        = 'Credentials saved. Open Settings and click Save & Connect, or reload the page.';
+    if (syncBtn)    syncBtn.style.display  = 'none';
+    if (signOutBtn) signOutBtn.style.display = 'none';
+  } else {
+    if (msg)        msg.textContent        = '';
+    if (syncBtn)    syncBtn.style.display  = 'none';
+    if (signOutBtn) signOutBtn.style.display = 'none';
+  }
+}
+
+// ─── LOCAL PERSISTENCE ────────────────────────────────────────────────────────
+function save() {
+  localStorage.setItem('north_tasks',    JSON.stringify(state.tasks));
+  localStorage.setItem('north_projects', JSON.stringify(state.projects));
+  localStorage.setItem('north_context',  state.context);
+}
+
+function load() {
+  try {
+    state.tasks    = JSON.parse(localStorage.getItem('north_tasks')    || '[]');
+    state.projects = JSON.parse(localStorage.getItem('north_projects') || '[]');
+    state.context  = localStorage.getItem('north_context') || 'deep_focus';
+    document.getElementById('contextSelect').value = state.context;
+  } catch(e) { state.tasks = []; state.projects = []; }
+}
+
+function getApiKey() { return localStorage.getItem('north_api_key') || ''; }
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (key) { localStorage.setItem('north_api_key', key); document.getElementById('setupPanel').style.display = 'none'; }
+}
+function saveApiKeyFromSettings() {
+  const key = document.getElementById('apiKeyInputSettings').value.trim();
+  if (key) {
+    localStorage.setItem('north_api_key', key);
+    document.getElementById('apiKeyStatus').textContent = '✓ Key saved.';
+  }
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify({ tasks: state.tasks, projects: state.projects }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `north-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+function importDataClick() { document.getElementById('importFile').click(); }
+function importData(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const d = JSON.parse(ev.target.result);
+      if (d.tasks)    state.tasks    = d.tasks;
+      if (d.projects) state.projects = d.projects;
+      save(); render();
+      if (sbClient && sbUser) {
+        state.tasks.forEach(t    => pushTask(t));
+        state.projects.forEach(p => pushProject(p));
+      }
+      alert('Data imported successfully.');
+    } catch { alert('Invalid backup file.'); }
+  };
+  reader.readAsText(file);
+}
+function clearAllData() {
+  if (confirm('Delete all tasks and projects? This cannot be undone.')) {
+    state.tasks = []; state.projects = []; save(); render();
+  }
+}
+
+// ─── SCORING ─────────────────────────────────────────────────────────────────
+function daysBetween(a, b) { return (b - a) / (1000 * 60 * 60 * 24); }
+
+function computeScore(task) {
+  const resistancePenalty = { low: 0, medium: 1, high: 2 }[task.emotional_resistance] || 0;
+  const loadWeight        = { low: 0, medium: 1, high: 2 }[task.cognitive_load]        || 0;
+  const daysUntilDue = task.due_date
+    ? Math.max(0, daysBetween(new Date(), new Date(task.due_date)))
+    : 30;
+  const urgencyDecay = Math.max(0, 5 - daysUntilDue * 0.1);
+  return (task.urgency * 2) + task.priority + urgencyDecay - resistancePenalty + loadWeight;
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+  document.getElementById('tab-' + name).style.display = 'block';
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  render();
+}
+
+function setContext(val) { state.context = val; save(); render(); }
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function render() {
+  renderToday();
+  renderInbox();
+  renderProjects();
+  renderAllTasks();
+  renderSettings();
+  Object.keys(aiSuggestions).forEach(taskId => {
+    if (aiSuggestions[taskId].length > 0) renderAiSuggestions(taskId);
+  });
+}
+
+function taskCard(task, opts = {}) {
+  const project  = state.projects.find(p => p.id === task.project_id);
+  const isActive  = task.status === 'active';
+  const isBlocked = task.status === 'blocked' || task.status === 'waiting';
+  const isDone    = task.status === 'completed';
+
+  let classes = 'task-card';
+  if (isActive)  classes += ' active-task';
+  if (isBlocked) classes += ' blocked-task';
+  if (isDone)    classes += ' completed-task';
+
+  const proj        = project ? `<span class="badge">${project.title}</span>` : '';
+  const loadBadge   = `<span class="badge load-${task.cognitive_load}">${task.cognitive_load} load</span>`;
+  const resistBadge = task.emotional_resistance !== 'low'
+    ? `<span class="badge resist-high">resist: ${task.emotional_resistance}</span>` : '';
+  const minsBadge   = task.estimated_minutes ? `<span class="badge">${task.estimated_minutes}min</span>` : '';
+  const typeBadge   = `<span class="badge">${task.type.replace('_', ' ')}</span>`;
+  const recurBadge  = task.recurrence && task.recurrence !== 'none'
+    ? `<span class="badge recurring">↻ ${task.recurrence}</span>` : '';
+  const nextAction  = task.next_action
+    ? `<div class="task-next">→ <span>${task.next_action}</span></div>` : '';
+
+  let subtasksHtml = '';
+  if (task.subtasks && task.subtasks.length > 0) {
+    subtasksHtml = `<div class="subtasks">${task.subtasks.map((s, i) =>
+      `<label class="subtask-item ${s.done ? 'done-sub' : ''}">
+        <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleSubtask('${task.id}', ${i})" />
+        ${s.title}
+      </label>`
+    ).join('')}</div>`;
+  }
+
+  const decomposeBtn = opts.showDecompose !== false
+    ? `<button class="task-btn" onclick="decompose('${task.id}')">AI split</button>` : '';
+  const doneBtn = !isDone
+    ? `<button class="task-btn done-btn" onclick="completeTask('${task.id}')">Done</button>` : '';
+
+  return `
+    <div class="${classes}" id="card-${task.id}">
+      <div class="task-header">
+        <div class="task-title ${isDone ? 'done' : ''}">${task.title}</div>
+        <div class="task-actions">
+          ${decomposeBtn}
+          <button class="task-btn" onclick="editTask('${task.id}')">Edit</button>
+          ${doneBtn}
+          <button class="task-btn delete-btn" onclick="deleteTask('${task.id}')">×</button>
+        </div>
+      </div>
+      ${nextAction}
+      <div class="task-meta">${loadBadge}${resistBadge}${minsBadge}${typeBadge}${recurBadge}${proj}</div>
+      ${subtasksHtml}
+      <div id="ai-suggestions-${task.id}"></div>
+    </div>`;
+}
+
+function renderToday() {
+  const ctx    = CONTEXTS[state.context];
+  const active = state.tasks.filter(t => t.status !== 'completed');
+  const scored = active.map(t => ({ ...t, _score: computeScore(t) }));
+
+  const eligible = scored.filter(t => !['blocked', 'waiting'].includes(t.status));
+  const sorted   = [...eligible].sort((a, b) => b._score - a._score);
+
+  const topPriorities = sorted.slice(0, 3);
+  const topIds        = new Set(topPriorities.map(t => t.id));
+
+  const quickWins = sorted
+    .filter(t => !topIds.has(t.id) && t.cognitive_load === 'low' && t.emotional_resistance === 'low')
+    .slice(0, 5);
+  const quickIds = new Set(quickWins.map(t => t.id));
+
+  const deepWork = ctx.deep_work_allowed
+    ? sorted.filter(t => !topIds.has(t.id) && !quickIds.has(t.id) && t.cognitive_load === 'high' && t.type === 'deep_work').slice(0, 3)
+    : [];
+
+  const blocked = scored.filter(t => t.status === 'blocked' || t.status === 'waiting');
+
+  document.getElementById('topPrioritiesList').innerHTML =
+    topPriorities.length ? topPriorities.map(t => taskCard(t)).join('') : '<div class="empty">No tasks yet.</div>';
+  document.getElementById('quickWinsList').innerHTML =
+    quickWins.length ? quickWins.map(t => taskCard(t)).join('') : '<div class="empty">No quick wins available.</div>';
+
+  const dw = document.getElementById('deepWorkSection');
+  if (ctx.deep_work_allowed) {
+    dw.style.display = '';
+    document.getElementById('deepWorkList').innerHTML =
+      deepWork.length ? deepWork.map(t => taskCard(t)).join('') : '<div class="empty">No deep work tasks.</div>';
+  } else {
+    dw.style.display = 'none';
+  }
+
+  document.getElementById('blockedList').innerHTML =
+    blocked.length ? blocked.map(t => taskCard(t, { showDecompose: false })).join('') : '<div class="empty">Nothing blocked.</div>';
+
+  const overloadBanner = document.getElementById('overloadBanner');
+  const activeTasks    = state.tasks.filter(t => t.status === 'active');
+  if (activeTasks.length > 8) {
+    overloadBanner.classList.add('visible');
+    document.getElementById('overloadMsg').textContent =
+      `You have ${activeTasks.length} active tasks. That's too many to hold in working memory. Consider blocking or deferring the lowest-priority ones.`;
+  } else {
+    overloadBanner.classList.remove('visible');
+  }
+
+  if (!getApiKey()) document.getElementById('setupPanel').style.display = '';
+}
+
+function renderInbox() {
+  const inbox = state.tasks.filter(t => t.status === 'inbox');
+  const list  = document.getElementById('inboxList');
+  const empty = document.getElementById('inboxEmpty');
+  if (!inbox.length) { list.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  list.innerHTML = inbox.map(task => `
+    <div class="triage-card" id="triage-${task.id}">
+      <div class="triage-title">${task.title}</div>
+      <div class="triage-row">
+        <select class="triage-select" id="triage-load-${task.id}">
+          <option value="low">Low load</option>
+          <option value="medium">Medium load</option>
+          <option value="high">High load</option>
+        </select>
+        <select class="triage-select" id="triage-urgency-${task.id}">
+          <option value="1">Urgency 1</option>
+          <option value="2">Urgency 2</option>
+          <option value="3" selected>Urgency 3</option>
+          <option value="4">Urgency 4</option>
+          <option value="5">Urgency 5</option>
+        </select>
+        <select class="triage-select" id="triage-type-${task.id}">
+          <option value="deep_work">Deep Work</option>
+          <option value="administrative">Admin</option>
+          <option value="routine">Routine</option>
+          <option value="urgent">Urgent</option>
+          <option value="delegable">Delegable</option>
+        </select>
+        <button class="triage-confirm" onclick="triageTask('${task.id}')">→ Plan</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderProjects() {
+  const list = document.getElementById('projectsList');
+  if (!state.projects.length) { list.innerHTML = '<div class="empty">No projects yet.</div>'; return; }
+  list.innerHTML = state.projects.map(p => {
+    const taskCount = state.tasks.filter(t => t.project_id === p.id && t.status !== 'completed').length;
+    return `<div class="project-card">
+      <div>
+        <div class="project-name">${p.title}</div>
+        ${p.description ? `<div class="project-status">${p.description}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span class="project-task-count">${taskCount} task${taskCount !== 1 ? 's' : ''}</span>
+        <span class="badge">${p.status}</span>
+        <button class="task-btn" onclick="editProject('${p.id}')">Edit</button>
+        <button class="task-btn" onclick="generateProjectTasks('${p.id}')">AI tasks</button>
+        <button class="task-btn delete-btn" onclick="deleteProject('${p.id}')">×</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderAllTasks() {
+  const list   = document.getElementById('allTasksList');
+  const active = state.tasks.filter(t => t.status !== 'completed');
+  list.innerHTML = active.length
+    ? active.sort((a, b) => computeScore(b) - computeScore(a)).map(t => taskCard(t)).join('')
+    : '<div class="empty">No tasks.</div>';
+
+  const completed     = state.tasks.filter(t => t.status === 'completed');
+  const completedList = document.getElementById('completedTasksList');
+  const label         = document.getElementById('completedToggleLabel');
+  if (completedList && label) {
+    label.textContent       = completed.length ? `(${completed.length} — click to show)` : '(none)';
+    completedList.innerHTML = completed.length
+      ? completed.slice().reverse().map(t => taskCard(t, { showDecompose: false })).join('')
+      : '<div class="empty">No completed tasks yet.</div>';
+  }
+}
+
+function renderSettings() {
+  const key    = getApiKey();
+  const status = document.getElementById('apiKeyStatus');
+  if (status) status.textContent = key ? `✓ Key saved (${key.slice(0,8)}…)` : 'No key saved.';
+  const input = document.getElementById('apiKeyInputSettings');
+  if (input && key) input.placeholder = key.slice(0,8) + '…';
+  updateSbSettingsUI();
+}
+
+// ─── TASK CRUD ────────────────────────────────────────────────────────────────
+function openAddTask(source) {
+  state.editingTaskId = null;
+  document.getElementById('taskFormTitle').textContent     = 'New Task';
+  document.getElementById('taskTitle').value               = '';
+  document.getElementById('taskDesc').value                = '';
+  document.getElementById('taskNextAction').value          = '';
+  document.getElementById('taskType').value                = 'deep_work';
+  document.getElementById('taskStatus').value              = source === 'inbox' ? 'inbox' : 'planned';
+  document.getElementById('taskLoad').value                = 'medium';
+  document.getElementById('taskResistance').value          = 'low';
+  document.getElementById('taskUrgency').value             = 3;
+  document.getElementById('taskUrgencyVal').textContent    = 3;
+  document.getElementById('taskPriority').value            = 3;
+  document.getElementById('taskPriorityVal').textContent   = 3;
+  document.getElementById('taskMinutes').value             = '';
+  document.getElementById('taskDueDate').value             = '';
+  document.getElementById('taskDelegable').value           = 'false';
+  document.getElementById('taskRecurrence').value          = 'none';
+  populateProjectSelect();
+  document.getElementById('taskFormPanel').style.display = 'block';
+}
+
+function editTask(id) {
+  const task = state.tasks.find(t => t.id === id); if (!task) return;
+  state.editingTaskId = id;
+  document.getElementById('taskFormTitle').textContent     = 'Edit Task';
+  document.getElementById('taskTitle').value               = task.title || '';
+  document.getElementById('taskDesc').value                = task.description || '';
+  document.getElementById('taskNextAction').value          = task.next_action || '';
+  document.getElementById('taskType').value                = task.type || 'deep_work';
+  document.getElementById('taskStatus').value              = task.status || 'planned';
+  document.getElementById('taskLoad').value                = task.cognitive_load || 'medium';
+  document.getElementById('taskResistance').value          = task.emotional_resistance || 'low';
+  document.getElementById('taskUrgency').value             = task.urgency || 3;
+  document.getElementById('taskUrgencyVal').textContent    = task.urgency || 3;
+  document.getElementById('taskPriority').value            = task.priority || 3;
+  document.getElementById('taskPriorityVal').textContent   = task.priority || 3;
+  document.getElementById('taskMinutes').value             = task.estimated_minutes || '';
+  document.getElementById('taskDueDate').value             = task.due_date || '';
+  document.getElementById('taskDelegable').value           = task.delegable ? 'true' : 'false';
+  document.getElementById('taskRecurrence').value          = task.recurrence || 'none';
+  populateProjectSelect(task.project_id);
+  document.getElementById('taskFormPanel').style.display = 'block';
+}
+
+function populateProjectSelect(selectedId) {
+  const sel = document.getElementById('taskProject');
+  sel.innerHTML = '<option value="">— No project —</option>';
+  state.projects.filter(p => p.status !== 'completed').forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id; opt.textContent = p.title;
+    if (p.id === selectedId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function saveTask() {
+  const title = document.getElementById('taskTitle').value.trim();
+  if (!title) { alert('Title is required.'); return; }
+
+  const taskData = {
+    title,
+    description:          document.getElementById('taskDesc').value.trim(),
+    next_action:          document.getElementById('taskNextAction').value.trim(),
+    project_id:           document.getElementById('taskProject').value || null,
+    type:                 document.getElementById('taskType').value,
+    status:               document.getElementById('taskStatus').value,
+    cognitive_load:       document.getElementById('taskLoad').value,
+    emotional_resistance: document.getElementById('taskResistance').value,
+    urgency:              parseInt(document.getElementById('taskUrgency').value),
+    priority:             parseInt(document.getElementById('taskPriority').value),
+    estimated_minutes:    parseInt(document.getElementById('taskMinutes').value) || null,
+    due_date:             document.getElementById('taskDueDate').value || null,
+    delegable:            document.getElementById('taskDelegable').value === 'true',
+    recurrence:           document.getElementById('taskRecurrence').value,
+    updated_at:           new Date().toISOString(),
+  };
+
+  let savedTask;
+  if (state.editingTaskId) {
+    const idx = state.tasks.findIndex(t => t.id === state.editingTaskId);
+    if (idx !== -1) { state.tasks[idx] = { ...state.tasks[idx], ...taskData }; savedTask = state.tasks[idx]; }
+  } else {
+    savedTask = { ...taskData, id: crypto.randomUUID(), subtasks: [], created_at: new Date().toISOString() };
+    state.tasks.push(savedTask);
+  }
+  save(); closeTaskForm(); render();
+  if (savedTask) pushTask(savedTask);
+}
+
+function closeTaskForm() {
+  document.getElementById('taskFormPanel').style.display = 'none';
+  state.editingTaskId = null;
+}
+
+function deleteTask(id) {
+  if (!confirm('Delete this task?')) return;
+  state.tasks = state.tasks.filter(t => t.id !== id);
+  save(); render();
+  removeTaskSb(id);
+}
+
+function completeTask(id) {
+  const task = state.tasks.find(t => t.id === id); if (!task) return;
+  if (task.recurrence && task.recurrence !== 'none') {
+    const next = new Date();
+    if (task.recurrence === 'daily')  next.setDate(next.getDate() + 1);
+    if (task.recurrence === 'weekly') next.setDate(next.getDate() + 7);
+    task.due_date = next.toISOString().slice(0, 10);
+    task.status   = 'planned';
+  } else {
+    task.status = 'completed';
+  }
+  task.updated_at = new Date().toISOString();
+  save(); render();
+  pushTask(task);
+}
+
+function toggleSubtask(taskId, idx) {
+  const task = state.tasks.find(t => t.id === taskId); if (!task || !task.subtasks) return;
+  task.subtasks[idx].done = !task.subtasks[idx].done;
+  task.updated_at = new Date().toISOString();
+  save(); render();
+  pushTask(task);
+}
+
+function triageTask(id) {
+  const task = state.tasks.find(t => t.id === id); if (!task) return;
+  task.cognitive_load = document.getElementById(`triage-load-${id}`).value;
+  task.urgency        = parseInt(document.getElementById(`triage-urgency-${id}`).value);
+  task.type           = document.getElementById(`triage-type-${id}`).value;
+  task.status         = 'planned';
+  task.updated_at     = new Date().toISOString();
+  save(); render();
+  pushTask(task);
+}
+
+// ─── PROJECT CRUD ─────────────────────────────────────────────────────────────
+function openProjectForm() {
+  state.editingProjectId = null;
+  document.getElementById('projTitle').value                 = '';
+  document.getElementById('projDesc').value                  = '';
+  document.getElementById('projStatus').value                = 'active';
+  document.getElementById('projPriority').value              = 3;
+  document.getElementById('projPriorityVal').textContent     = 3;
+  document.getElementById('addProjectForm').classList.add('visible');
+}
+
+function editProject(id) {
+  const p = state.projects.find(p => p.id === id); if (!p) return;
+  state.editingProjectId = id;
+  document.getElementById('projTitle').value             = p.title;
+  document.getElementById('projDesc').value              = p.description || '';
+  document.getElementById('projStatus').value            = p.status;
+  document.getElementById('projPriority').value          = p.priority;
+  document.getElementById('projPriorityVal').textContent = p.priority;
+  document.getElementById('addProjectForm').classList.add('visible');
+}
+
+function saveProject() {
+  const title = document.getElementById('projTitle').value.trim();
+  if (!title) { alert('Project name is required.'); return; }
+  const data = {
+    title,
+    description: document.getElementById('projDesc').value.trim(),
+    status:      document.getElementById('projStatus').value,
+    priority:    parseInt(document.getElementById('projPriority').value),
+    updated_at:  new Date().toISOString(),
+  };
+  let savedProject;
+  if (state.editingProjectId) {
+    const idx = state.projects.findIndex(p => p.id === state.editingProjectId);
+    if (idx !== -1) { state.projects[idx] = { ...state.projects[idx], ...data }; savedProject = state.projects[idx]; }
+  } else {
+    savedProject = { ...data, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+    state.projects.push(savedProject);
+  }
+  save(); closeProjectForm(); render();
+  if (savedProject) pushProject(savedProject);
+}
+
+function closeProjectForm() {
+  document.getElementById('addProjectForm').classList.remove('visible');
+  state.editingProjectId = null;
+}
+
+function deleteProject(id) {
+  if (!confirm('Delete project? Tasks will become unassigned.')) return;
+  state.projects = state.projects.filter(p => p.id !== id);
+  state.tasks.forEach(t => { if (t.project_id === id) t.project_id = null; });
+  save(); render();
+  removeProjectSb(id);
+}
+
+function toggleCompleted() {
+  const el    = document.getElementById('completedTasksList');
+  const label = document.getElementById('completedToggleLabel');
+  const isHidden = el.style.display === 'none';
+  el.style.display = isHidden ? 'block' : 'none';
+  const count = state.tasks.filter(t => t.status === 'completed').length;
+  label.textContent = isHidden ? `(${count} — click to hide)` : `(${count} — click to show)`;
+}
+
+// ─── AI FEATURES ──────────────────────────────────────────────────────────────
+async function generateProjectTasks(projectId) {
+  const project = state.projects.find(p => p.id === projectId); if (!project) return;
+  const panel   = document.getElementById('projectAiPanel');
+  const listEl  = document.getElementById('projectAiList');
+  panel.style.display = 'block';
+  document.getElementById('projectAiTitle').textContent = `AI Suggested Tasks — ${project.title}`;
+  listEl.innerHTML = '<div class="loading">Generating tasks…</div>';
+  try {
+    const raw = await callClaude(
+      'You are a task planning assistant. Given a project, suggest 4 to 6 concrete tasks needed to complete it. For each task include: title, type (deep_work|administrative|routine|urgent|delegable), cognitive_load (low|medium|high), emotional_resistance (low|medium|high), urgency (1-5). Respond ONLY with a valid JSON array. No preamble, no markdown.',
+      `Project: "${project.title}"\nDescription: ${project.description || 'none'}`
+    );
+    if (!raw) return;
+    const tasks = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    panel.dataset.projectId   = projectId;
+    panel.dataset.suggestions = JSON.stringify(tasks);
+    listEl.innerHTML = tasks.map((t, i) => `
+      <div class="ai-subtask-suggestion">
+        <button class="ai-accept-btn" onclick="acceptProjectTask(${i})">+ Add</button>
+        <span>${t.title} <span style="color:var(--muted);font-size:10px;">${t.type.replace('_',' ')} · ${t.cognitive_load} load · urgency ${t.urgency}</span></span>
+      </div>`).join('');
+  } catch(e) {
+    listEl.innerHTML = `<div class="loading">Error: ${e.message.slice(0,80)}</div>`;
+  }
+}
+
+function acceptProjectTask(idx) {
+  const panel       = document.getElementById('projectAiPanel');
+  const projectId   = panel.dataset.projectId;
+  const suggestions = JSON.parse(panel.dataset.suggestions || '[]');
+  const t = suggestions[idx]; if (!t) return;
+  const newTask = {
+    id: crypto.randomUUID(), title: t.title, description: '', next_action: '',
+    project_id: projectId, type: t.type || 'deep_work', status: 'planned',
+    cognitive_load: t.cognitive_load || 'medium', emotional_resistance: t.emotional_resistance || 'low',
+    urgency: t.urgency || 3, priority: 3, estimated_minutes: null, due_date: null,
+    delegable: false, recurrence: 'none', subtasks: [],
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+  };
+  state.tasks.push(newTask);
+  save(); render();
+  pushTask(newTask);
+  suggestions.splice(idx, 1);
+  panel.dataset.suggestions = JSON.stringify(suggestions);
+  const rows = document.getElementById('projectAiList').querySelectorAll('.ai-subtask-suggestion');
+  if (rows[idx]) rows[idx].style.opacity = '0.3';
+}
+
+async function callClaude(systemPrompt, userContent) {
+  const key = getApiKey();
+  if (!key) { document.getElementById('setupPanel').style.display = ''; return null; }
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userContent }],
+    }),
+  });
+  if (!res.ok) { const err = await res.text(); throw new Error(err); }
+  const data = await res.json();
+  return data.content[0].text;
+}
+
+const aiSuggestions = {};
+
+async function decompose(taskId) {
+  const task = state.tasks.find(t => t.id === taskId); if (!task) return;
+  const container = document.getElementById(`ai-suggestions-${taskId}`);
+  container.innerHTML = '<div class="loading">Decomposing task…</div>';
+  try {
+    const raw = await callClaude(
+      'You are a task decomposition assistant. Respond ONLY with a valid JSON array of 3 to 6 subtask strings. No preamble, no markdown, no explanation.',
+      `Task: "${task.title}"\nDescription: ${task.description || 'none'}\nNext action: ${task.next_action || 'none'}`
+    );
+    if (!raw) return;
+    const subtasks = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    aiSuggestions[taskId] = subtasks;
+    renderAiSuggestions(taskId);
+  } catch(e) {
+    container.innerHTML = `<div class="loading">Error: ${e.message.slice(0,80)}</div>`;
+  }
+}
+
+function renderAiSuggestions(taskId) {
+  const container   = document.getElementById(`ai-suggestions-${taskId}`);
+  if (!container) return;
+  const suggestions = aiSuggestions[taskId] || [];
+  if (!suggestions.length) { container.innerHTML = ''; return; }
+  container.innerHTML = `
+    <div class="ai-subtasks">
+      <div class="ai-subtasks-title">AI Suggested Subtasks</div>
+      ${suggestions.map((s, i) => `
+        <div class="ai-subtask-suggestion">
+          <button class="ai-accept-btn" onclick="acceptSubtask('${taskId}', ${i})">+ Add</button>
+          <span>${s}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function acceptSubtask(taskId, idx) {
+  const task        = state.tasks.find(t => t.id === taskId); if (!task) return;
+  const suggestions = aiSuggestions[taskId] || [];
+  if (!suggestions[idx]) return;
+  if (!task.subtasks) task.subtasks = [];
+  task.subtasks.push({ id: crypto.randomUUID(), title: suggestions[idx], done: false });
+  task.updated_at = new Date().toISOString();
+  aiSuggestions[taskId].splice(idx, 1);
+  save(); render();
+  pushTask(task);
+  renderAiSuggestions(taskId);
+}
+
+async function askWhatNext() {
+  const key = getApiKey();
+  if (!key) { document.getElementById('setupPanel').style.display = ''; return; }
+  const ctx    = CONTEXTS[state.context];
+  const active = state.tasks.filter(t => t.status !== 'completed');
+  const top    = active.map(t => ({ ...t, _score: computeScore(t) })).sort((a, b) => b._score - a._score).slice(0, 5);
+  const panel  = document.getElementById('suggestionPanel');
+  document.getElementById('suggestionRec').textContent = 'Thinking…';
+  document.getElementById('suggestionWhy').textContent = '';
+  panel.classList.add('visible');
+  try {
+    const raw = await callClaude(
+      'You are a cognitive operations advisor. Recommend the single best next action given the context and task list. Respond ONLY with valid JSON: {"recommendation":"...","reasoning":"..."}. No preamble.',
+      `Context: ${ctx.name} (deep work: ${ctx.deep_work_allowed})\n\nTop tasks:\n${top.map(t =>
+        `- "${t.title}" | load: ${t.cognitive_load} | resistance: ${t.emotional_resistance} | urgency: ${t.urgency} | type: ${t.type} | next: ${t.next_action || 'not set'}`
+      ).join('\n')}`
+    );
+    if (!raw) return;
+    const result = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    document.getElementById('suggestionRec').textContent = result.recommendation;
+    document.getElementById('suggestionWhy').textContent = result.reasoning;
+  } catch(e) {
+    document.getElementById('suggestionRec').textContent = 'Could not get suggestion.';
+    document.getElementById('suggestionWhy').textContent = e.message.slice(0, 120);
+  }
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+load();       // instant — from localStorage
+render();     // paint immediately with cached data
+initSupabase(); // async — pulls from Supabase, re-renders if newer data found
+</script>
+</body>
+</html>

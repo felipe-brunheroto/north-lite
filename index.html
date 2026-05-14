@@ -311,12 +311,16 @@
   .wc-overlay {
     display: none; position: fixed; inset: 0;
     background: rgba(15,15,15,0.97); z-index: 300;
-    align-items: center; justify-content: center; padding: 24px;
+    overflow-y: auto;
+    align-items: flex-start; justify-content: center;
+    padding: 24px;
+    -webkit-overflow-scrolling: touch;
   }
   .wc-overlay.open { display: flex; }
   .wc-box {
     background: var(--bg2); border: 1px solid var(--border);
     padding: 36px; width: 100%; max-width: 480px;
+    margin: auto; /* centres vertically when content fits; stays at top when it doesn't */
   }
   .wc-logo { font-family: 'Instrument Serif', serif; font-size: 28px; color: var(--accent); margin-bottom: 6px; }
   .wc-sub { font-size: 11px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
@@ -328,6 +332,12 @@
   }
   .wc-desc { font-size: 12px; color: var(--muted); line-height: 1.7; }
   .wc-desc strong { color: var(--text); font-weight: normal; }
+
+  @media (max-width: 480px) {
+    .wc-box { padding: 24px 20px; }
+    .wc-row { gap: 14px; }
+    .wc-label { min-width: 52px; }
+  }
 
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: var(--bg); }

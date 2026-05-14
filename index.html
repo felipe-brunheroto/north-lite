@@ -52,7 +52,6 @@
     align-items: center;
     gap: 9px;
   }
-  /* Sync status dot — lives next to the logo */
   .sync-dot {
     width: 7px;
     height: 7px;
@@ -174,6 +173,39 @@
 
   .empty { color: var(--muted); font-size: 12px; padding: 16px 0; font-style: italic; }
 
+  /* ── TODAY EMPTY STATE ── */
+  .today-empty {
+    padding: 40px 0 24px;
+  }
+  .today-empty-heading {
+    font-family: 'Instrument Serif', serif;
+    font-size: 22px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .today-empty-body {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.8;
+    margin-bottom: 28px;
+    max-width: 400px;
+  }
+  .today-empty-body span {
+    color: var(--text);
+  }
+  .today-empty-cta {
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .today-empty-cta:hover { background: var(--accent-dim); }
+
   .what-next-btn {
     width: 100%; background: none; border: 1px solid var(--border); color: var(--muted);
     font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.08em;
@@ -275,6 +307,28 @@
   .sb-toggle { font-size: 11px; color: var(--muted); margin-top: 18px; }
   .sb-toggle button { background: none; border: none; color: var(--accent); font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; padding: 0; text-decoration: underline; }
 
+  /* ── WELCOME OVERLAY ── */
+  .wc-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(15,15,15,0.97); z-index: 300;
+    align-items: center; justify-content: center; padding: 24px;
+  }
+  .wc-overlay.open { display: flex; }
+  .wc-box {
+    background: var(--bg2); border: 1px solid var(--border);
+    padding: 36px; width: 100%; max-width: 480px;
+  }
+  .wc-logo { font-family: 'Instrument Serif', serif; font-size: 28px; color: var(--accent); margin-bottom: 6px; }
+  .wc-sub { font-size: 11px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+  .wc-rows { border-top: 1px solid var(--border); margin-bottom: 28px; }
+  .wc-row { display: flex; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .wc-label {
+    font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--accent); min-width: 60px; padding-top: 2px; flex-shrink: 0;
+  }
+  .wc-desc { font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .wc-desc strong { color: var(--text); font-weight: normal; }
+
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: var(--bg); }
   ::-webkit-scrollbar-thumb { background: var(--border); }
@@ -286,6 +340,37 @@
 </style>
 </head>
 <body>
+
+<!-- ─── WELCOME OVERLAY ───────────────────────────────────────────────────── -->
+<div class="wc-overlay" id="wcOverlay">
+  <div class="wc-box">
+    <div class="wc-logo">North</div>
+    <div class="wc-sub">A personal cognitive ops tool. Here's how it works in 30 seconds.</div>
+    <div class="wc-rows">
+      <div class="wc-row">
+        <div class="wc-label">Inbox</div>
+        <div class="wc-desc"><strong>Capture anything on your mind, instantly.</strong> No decisions required — just get it out of your head. Come back later to triage it.</div>
+      </div>
+      <div class="wc-row">
+        <div class="wc-label">Triage</div>
+        <div class="wc-desc">In Inbox, set load, urgency, and type for each item, then hit <strong>→ Plan</strong>. It moves into your queue and shows up on Today.</div>
+      </div>
+      <div class="wc-row">
+        <div class="wc-label">Today</div>
+        <div class="wc-desc"><strong>Your prioritized work, sorted automatically</strong> by urgency, cognitive load, and resistance. The top item is always your best next move.</div>
+      </div>
+      <div class="wc-row">
+        <div class="wc-label">Projects</div>
+        <div class="wc-desc">Group related tasks together. Use <strong>AI tasks</strong> to generate a starter list for any project instantly.</div>
+      </div>
+      <div class="wc-row">
+        <div class="wc-label">Context</div>
+        <div class="wc-desc">The <strong>dropdown in the top right</strong> tells North what kind of focus you have right now — Deep Focus, Admin Block, Fragmented, or Low Energy. It changes what's shown.</div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="dismissWelcome()">Got it →</button>
+  </div>
+</div>
 
 <!-- ─── SUPABASE LOGIN OVERLAY ────────────────────────────────────────────── -->
 <div class="sb-overlay" id="sbOverlay">
@@ -329,11 +414,11 @@
   </header>
 
   <nav>
-    <button class="nav-btn active" onclick="showTab('today')">Today</button>
-    <button class="nav-btn" onclick="showTab('inbox')">Inbox</button>
-    <button class="nav-btn" onclick="showTab('projects')">Projects</button>
-    <button class="nav-btn" onclick="showTab('all')">All Tasks</button>
-    <button class="nav-btn" onclick="showTab('settings')">Settings</button>
+    <button class="nav-btn active" data-tab="today" onclick="showTab('today')">Today</button>
+    <button class="nav-btn" data-tab="inbox" onclick="showTab('inbox')">Inbox</button>
+    <button class="nav-btn" data-tab="projects" onclick="showTab('projects')">Projects</button>
+    <button class="nav-btn" data-tab="all" onclick="showTab('all')">All Tasks</button>
+    <button class="nav-btn" data-tab="settings" onclick="showTab('settings')">Settings</button>
   </nav>
 
   <main>
@@ -353,28 +438,43 @@
         <div class="overload-msg" id="overloadMsg"></div>
       </div>
 
-      <button class="what-next-btn" onclick="askWhatNext()">→ What should I do right now?</button>
+      <!-- shown only when there are tasks -->
+      <div id="todayWithTasks" style="display:none;">
+        <button class="what-next-btn" onclick="askWhatNext()">→ What should I do right now?</button>
 
-      <div id="suggestionPanel" class="suggestion-panel">
-        <div class="suggestion-rec" id="suggestionRec"></div>
-        <div class="suggestion-why" id="suggestionWhy"></div>
+        <div id="suggestionPanel" class="suggestion-panel">
+          <div class="suggestion-rec" id="suggestionRec"></div>
+          <div class="suggestion-why" id="suggestionWhy"></div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Top Priorities</div>
+          <div id="topPrioritiesList"></div>
+        </div>
+        <div class="section">
+          <div class="section-label">Quick Wins</div>
+          <div id="quickWinsList"></div>
+        </div>
+        <div class="section" id="deepWorkSection">
+          <div class="section-label">Deep Work</div>
+          <div id="deepWorkList"></div>
+        </div>
+        <div class="section">
+          <div class="section-label">Blocked / Waiting</div>
+          <div id="blockedList"></div>
+        </div>
       </div>
 
-      <div class="section">
-        <div class="section-label">Top Priorities</div>
-        <div id="topPrioritiesList"></div>
-      </div>
-      <div class="section">
-        <div class="section-label">Quick Wins</div>
-        <div id="quickWinsList"></div>
-      </div>
-      <div class="section" id="deepWorkSection">
-        <div class="section-label">Deep Work</div>
-        <div id="deepWorkList"></div>
-      </div>
-      <div class="section">
-        <div class="section-label">Blocked / Waiting</div>
-        <div id="blockedList"></div>
+      <!-- shown only when there are zero tasks -->
+      <div id="todayEmpty" style="display:none;">
+        <div class="today-empty">
+          <div class="today-empty-heading">Nothing here yet.</div>
+          <div class="today-empty-body">
+            Start by capturing what's on your mind — go to <span>Inbox</span>, type anything, then hit <span>→ Plan</span> to triage it.<br><br>
+            It'll appear here, sorted automatically.
+          </div>
+          <button class="today-empty-cta" onclick="showTab('inbox')">→ Go to Inbox</button>
+        </div>
       </div>
 
       <button class="add-task-btn" onclick="openAddTask('today')">+ Add task</button>
@@ -383,9 +483,12 @@
     <!-- INBOX -->
     <div id="tab-inbox" style="display:none;">
       <div class="section">
-        <div class="section-label">Inbox — Triage</div>
+        <div class="section-label">Inbox — Capture &amp; Triage</div>
         <div id="inboxList"></div>
-        <div class="empty" id="inboxEmpty" style="display:none;">Inbox is clear.</div>
+        <div id="inboxEmpty" style="display:none;">
+          <div class="empty" style="margin-bottom:4px;">Inbox is clear — nothing to triage.</div>
+          <div style="font-size:11px;color:var(--muted);padding-bottom:8px;line-height:1.6;">Use this tab to capture anything new. No need to think about priority — just write it down and hit <em>→ Plan</em> to move it into your queue.</div>
+        </div>
       </div>
       <button class="add-task-btn" onclick="openAddTask('inbox')">+ Capture task</button>
     </div>
@@ -488,6 +591,15 @@
           <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)" />
           <button class="btn-secondary" style="color:var(--red);border-color:rgba(192,96,74,0.3);" onclick="clearAllData()">Clear all data</button>
         </div>
+      </div>
+
+      <!-- HELP SECTION -->
+      <div class="section">
+        <div class="section-label">Help</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.6;margin-bottom:12px;">
+          New here or want a refresher?
+        </div>
+        <button class="btn-secondary" onclick="reopenWelcome()">Show how North works</button>
       </div>
     </div>
 
@@ -647,6 +759,7 @@ async function initSupabase() {
       await pullFromSupabase();
       render();
       updateSbSettingsUI();
+      // Returning user — don't show welcome again (onboarded flag already set)
     } else {
       setDot('idle');
       openSbOverlay();
@@ -666,6 +779,7 @@ function closeSbOverlay() {
 }
 function sbUseOffline() {
   closeSbOverlay();
+  checkOnboarding();
 }
 function sbToggleMode() {
   sbMode = sbMode === 'signin' ? 'signup' : 'signin';
@@ -705,6 +819,7 @@ async function sbSubmit() {
     await pullFromSupabase();
     render();
     updateSbSettingsUI();
+    checkOnboarding(); // show welcome only on first ever sign-up/sign-in
   } catch(e) {
     errEl.textContent = e.message || 'Authentication failed.';
     setDot('error');
@@ -733,7 +848,7 @@ async function pullFromSupabase() {
     if (pe) throw pe;
     if (tasks    !== null) state.tasks    = tasks.map(t => ({ ...t, subtasks: t.subtasks || [] }));
     if (projects !== null) state.projects = projects;
-    resetRecurringTasks(); // revive any that are due; keep completed ones hidden
+    resetRecurringTasks();
     localStorage.setItem('north_tasks',    JSON.stringify(state.tasks));
     localStorage.setItem('north_projects', JSON.stringify(state.projects));
     setDot('synced');
@@ -751,7 +866,6 @@ async function syncNow() {
 async function pushTask(task) {
   if (!sbClient || !sbUser) return;
   try {
-    // Strip client-only fields that have no column in Supabase
     const { last_done_date, _score, ...taskData } = task;
     const { error } = await sbClient.from('tasks').upsert({
       ...taskData,
@@ -804,6 +918,20 @@ function updateSbSettingsUI() {
     if (syncBtn)    syncBtn.style.display    = 'none';
     if (signOutBtn) signOutBtn.style.display = 'none';
   }
+}
+
+// ─── WELCOME / ONBOARDING ────────────────────────────────────────────────────
+function checkOnboarding() {
+  if (!localStorage.getItem('north_onboarded')) {
+    document.getElementById('wcOverlay').classList.add('open');
+  }
+}
+function dismissWelcome() {
+  localStorage.setItem('north_onboarded', '1');
+  document.getElementById('wcOverlay').classList.remove('open');
+}
+function reopenWelcome() {
+  document.getElementById('wcOverlay').classList.add('open');
 }
 
 // ─── LOCAL PERSISTENCE ────────────────────────────────────────────────────────
@@ -884,8 +1012,9 @@ function computeScore(task) {
 function showTab(name) {
   document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
   document.getElementById('tab-' + name).style.display = 'block';
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === name);
+  });
   render();
 }
 
@@ -961,6 +1090,23 @@ function taskCard(task, opts = {}) {
 function renderToday() {
   const ctx    = CONTEXTS[state.context];
   const active = state.tasks.filter(t => t.status !== 'completed');
+
+  // Toggle between empty state and task view
+  const withTasks = document.getElementById('todayWithTasks');
+  const emptyEl   = document.getElementById('todayEmpty');
+
+  if (active.length === 0) {
+    withTasks.style.display = 'none';
+    emptyEl.style.display   = 'block';
+    // Still check overload banner (won't trigger with 0 tasks, but keep logic consistent)
+    document.getElementById('overloadBanner').classList.remove('visible');
+    if (!getApiKey()) document.getElementById('setupPanel').style.display = '';
+    return;
+  }
+
+  withTasks.style.display = 'block';
+  emptyEl.style.display   = 'none';
+
   const scored = active.map(t => ({ ...t, _score: computeScore(t) }));
 
   const eligible = scored.filter(t => !['blocked', 'waiting'].includes(t.status));
@@ -1198,7 +1344,6 @@ function deleteTask(id) {
 function completeTask(id) {
   const task = state.tasks.find(t => t.id === id); if (!task) return;
   if (task.recurrence && task.recurrence !== 'none') {
-    // Mark completed for today — disappears now, reappears when due_date arrives
     const next = new Date();
     if (task.recurrence === 'daily')  next.setDate(next.getDate() + 1);
     if (task.recurrence === 'weekly') next.setDate(next.getDate() + 7);
@@ -1212,8 +1357,6 @@ function completeTask(id) {
   pushTask(task);
 }
 
-// Called on every app load and after every sync pull —
-// revives recurring tasks whose due_date has arrived
 function resetRecurringTasks() {
   const today   = new Date().toISOString().slice(0, 10);
   const toReset = state.tasks.filter(t =>

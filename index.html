@@ -1237,17 +1237,37 @@ function deleteTask(id) {
 function completeTask(id) {
   const task = state.tasks.find(t => t.id === id); if (!task) return;
   if (task.recurrence && task.recurrence !== 'none') {
-    const next = new Date();
+    // Mark completed for today — disappears now, reappears tomorrow
+    const today = new Date().toISOString().slice(0, 10);
+    const next  = new Date();
     if (task.recurrence === 'daily')  next.setDate(next.getDate() + 1);
     if (task.recurrence === 'weekly') next.setDate(next.getDate() + 7);
-    task.due_date = next.toISOString().slice(0, 10);
-    task.status   = 'planned';
+    task.status         = 'completed';
+    task.last_done_date = today;
+    task.due_date       = next.toISOString().slice(0, 10);
   } else {
     task.status = 'completed';
   }
   task.updated_at = new Date().toISOString();
   save(); render();
   pushTask(task);
+}
+
+// Called on every app load — revives recurring tasks whose next due date has arrived
+function resetRecurringTasks() {
+  const today   = new Date().toISOString().slice(0, 10);
+  const toReset = state.tasks.filter(t =>
+    t.recurrence && t.recurrence !== 'none' &&
+    t.status === 'completed' &&
+    t.last_done_date && t.last_done_date < today
+  );
+  if (!toReset.length) return;
+  toReset.forEach(task => {
+    task.status     = 'planned';
+    task.updated_at = new Date().toISOString();
+  });
+  save();
+  toReset.forEach(task => pushTask(task));
 }
 
 function toggleSubtask(taskId, idx) {
@@ -1484,9 +1504,10 @@ async function askWhatNext() {
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
-load();       // instant — from localStorage
-render();     // paint immediately with cached data
-initSupabase(); // async — pulls from Supabase, re-renders if newer data found
+load();                 // instant — from localStorage
+resetRecurringTasks(); // revive any recurring tasks due today
+render();              // paint immediately with cached data
+initSupabase();        // async — pulls from Supabase, re-renders if newer data found
 </script>
 </body>
 </html>

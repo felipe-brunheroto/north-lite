@@ -456,25 +456,12 @@
         <div class="section-label">Sync</div>
         <div class="setup-panel">
           <div class="setup-title">Cross-Device Sync</div>
-          <div class="setup-note">
-            Paste your Supabase Project URL and anon key below. You only do this once — it's saved in your browser.
-            Get these from your Supabase project under <strong style="color:var(--text);">Settings → API</strong>.
-          </div>
-          <div style="margin-bottom:12px;">
-            <label>Project URL</label>
-            <input type="text" id="sbUrlInput" placeholder="https://xxxx.supabase.co" />
-          </div>
-          <div style="margin-bottom:16px;">
-            <label>Anon / Public Key</label>
-            <input type="text" id="sbKeyInput" placeholder="eyJhbGci..." />
-          </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="setup-save" onclick="saveSbCreds()">Save &amp; Connect</button>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">
             <button class="setup-save" id="sbSyncNowBtn" onclick="syncNow()" style="display:none;">↻ Sync Now</button>
             <button class="setup-save" id="sbSignOutBtn" onclick="sbSignOut()"
                     style="display:none;border-color:var(--red);color:var(--red);">Sign Out</button>
           </div>
-          <div id="sbSettingsMsg" style="margin-top:12px;font-size:11px;color:var(--muted);line-height:1.5;"></div>
+          <div id="sbSettingsMsg" style="font-size:11px;color:var(--muted);line-height:1.5;">Checking…</div>
         </div>
       </div>
 
@@ -626,16 +613,12 @@ const CONTEXTS = {
 };
 
 // ─── SUPABASE LAYER ───────────────────────────────────────────────────────────
+const SB_URL = 'https://aervjpiqfozgzydwboey.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFlcnZqcGlxZm96Z3p5ZHdib2V5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MDg0ODYsImV4cCI6MjA5NDI4NDQ4Nn0.0pNki0NCfXsMAZ7M7XvV48sjHXhbQmxcvFfvUC3BKxQ';
+
 let sbClient = null;
 let sbUser   = null;
 let sbMode   = 'signin'; // 'signin' | 'signup'
-
-function getSbCreds() {
-  return {
-    url: localStorage.getItem('north_sb_url') || '',
-    key: localStorage.getItem('north_sb_key') || '',
-  };
-}
 
 // Visual sync indicator in header
 function setDot(status) {
@@ -653,10 +636,8 @@ function setDot(status) {
 }
 
 async function initSupabase() {
-  const { url, key } = getSbCreds();
-  if (!url || !key) { setDot('idle'); return; }
   try {
-    sbClient = window.supabase.createClient(url, key, {
+    sbClient = window.supabase.createClient(SB_URL, SB_KEY, {
       auth: { persistSession: true, storageKey: 'north_sb_session' },
     });
     setDot('syncing');
@@ -807,40 +788,17 @@ async function removeProjectSb(id) {
 }
 
 // ── Settings UI ──────────────────────────────────────────────────────────────
-function saveSbCreds() {
-  const url = document.getElementById('sbUrlInput').value.trim();
-  const key = document.getElementById('sbKeyInput').value.trim();
-  if (!url || !key) { document.getElementById('sbSettingsMsg').textContent = 'Both fields are required.'; return; }
-  localStorage.setItem('north_sb_url', url);
-  localStorage.setItem('north_sb_key', key);
-  document.getElementById('sbSettingsMsg').textContent = 'Connecting…';
-  // Re-init so the overlay appears if not yet signed in
-  sbClient = null; sbUser = null;
-  initSupabase().then(updateSbSettingsUI);
-}
-
 function updateSbSettingsUI() {
   const msg        = document.getElementById('sbSettingsMsg');
   const syncBtn    = document.getElementById('sbSyncNowBtn');
   const signOutBtn = document.getElementById('sbSignOutBtn');
-  const urlInput   = document.getElementById('sbUrlInput');
-  const { url, key } = getSbCreds();
-
-  if (urlInput && url) urlInput.value = url;
-  const keyInput = document.getElementById('sbKeyInput');
-  if (keyInput && key) keyInput.value = key;
-
   if (sbUser) {
-    if (msg)        msg.textContent        = `✓ Signed in as ${sbUser.email}`;
-    if (syncBtn)    syncBtn.style.display  = '';
+    if (msg)        msg.textContent          = `✓ Signed in as ${sbUser.email}`;
+    if (syncBtn)    syncBtn.style.display    = '';
     if (signOutBtn) signOutBtn.style.display = '';
-  } else if (url && key) {
-    if (msg)        msg.textContent        = 'Credentials saved. Open Settings and click Save & Connect, or reload the page.';
-    if (syncBtn)    syncBtn.style.display  = 'none';
-    if (signOutBtn) signOutBtn.style.display = 'none';
   } else {
-    if (msg)        msg.textContent        = '';
-    if (syncBtn)    syncBtn.style.display  = 'none';
+    if (msg)        msg.textContent          = 'Not signed in.';
+    if (syncBtn)    syncBtn.style.display    = 'none';
     if (signOutBtn) signOutBtn.style.display = 'none';
   }
 }
